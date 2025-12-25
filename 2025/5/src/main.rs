@@ -83,7 +83,7 @@ fn main() {
         }
     }
 
-    let fresh_count = lines_iterator
+    let fresh_count_1 = lines_iterator
         .by_ref()
         .filter(|line| {
             let id = line.parse::<u64>().expect("Invalid ID number");
@@ -98,5 +98,12 @@ fn main() {
         })
         .count();
 
-    println!("{} IDs are fresh", fresh_count);
+    println!("{} IDs are fresh (part one)", fresh_count_1);
+
+    let fresh_count_2 = fresh_id_ranges
+        .iter()
+        .map(|(start, end)| (end - start) + 1)
+        .sum::<u64>();
+
+    println!("{} IDs are fresh (part two)", fresh_count_2);
 }
