@@ -4,11 +4,11 @@ fn main() {
     let contents = fs::read_to_string("input.txt").expect("Failed to read input file");
     let mut lines = contents.lines();
 
-    let mut beams: Vec<bool> = Vec::new();
+    let mut beams: Vec<i64> = Vec::new();
     for character in lines.by_ref().take(1).last().unwrap().chars() {
         match character {
-            '.' => beams.push(false),
-            'S' => beams.push(true),
+            '.' => beams.push(0),
+            'S' => beams.push(1),
             _ => panic!("Unexpected character in input"),
         }
     }
@@ -20,31 +20,33 @@ fn main() {
             match character {
                 '.' => continue,
                 '^' => {
-                    if !beams[index]
+                    if beams[index] == 0
                         || last_flipped.is_some_and(|last_flipped| last_flipped == index)
                     {
                         continue;
                     }
 
                     splits += 1;
-                    beams[index] = false;
 
-                    if index > 1 {
-                        beams[index - 1] = true;
+                    if index > 0 {
+                        beams[index - 1] += beams[index];
                     }
 
                     if index < beams.len() - 1 {
-                        if !beams[index + 1] {
+                        if beams[index + 1] == 0 {
                             last_flipped = Some(index + 1);
                         }
 
-                        beams[index + 1] = true;
+                        beams[index + 1] += beams[index];
                     }
+
+                    beams[index] = 0;
                 }
                 _ => panic!("Unexpected character in input"),
             }
         }
     }
 
-    println!("Splits: {}", splits);
+    println!("Splits: {} (part one)", splits);
+    println!("Timelines: {} (part two)", beams.iter().sum::<i64>());
 }
