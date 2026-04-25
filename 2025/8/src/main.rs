@@ -1,0 +1,130 @@
+use std::{cell::RefCell, collections::HashMap, fs, rc::Rc};
+
+const DIMENSIONS: usize = 3;
+
+const LARGEST_N_GROUPS_N: usize = 3;
+const CLOSEST_N_EDGES_N: usize = 1000;
+
+type Point = [i64; DIMENSIONS];
+
+struct Edge<'a> {
+    distance: f64,
+    one: &'a Point,
+    two: &'a Point,
+}
+
+struct Group<'a> {
+    size: usize,
+    points: Vec<&'a Point>,
+}
+
+fn part_one(edges: &Vec<Edge>) {
+    let mut points_to_groups: HashMap<&Point, Rc<RefCell<Group>>> = HashMap::new();
+    for edge in edges.iter().take(CLOSEST_N_EDGES_N) {
+        match (
+            points_to_groups.get(edge.one).cloned(),
+            points_to_groups.get(edge.two).cloned(),
+        ) {
+            (Some(group_one), Some(group_two)) => {
+                if Rc::ptr_eq(&group_one, &group_two) {
+                    continue;
+                }
+
+                let bigger_group_rc: Rc<RefCell<Group>>;
+                let smaller_group_rc: Rc<RefCell<Group>>;
+                if group_one.borrow().size >= group_two.borrow().size {
+                    bigger_group_rc = group_one.clone();
+                    smaller_group_rc = group_two.clone();
+                } else {
+                    bigger_group_rc = group_two.clone();
+                    smaller_group_rc = group_one.clone();
+                }
+
+                let mut bigger_group = bigger_group_rc.borrow_mut();
+                let smaller_group = smaller_group_rc.borrow();
+                bigger_group.size += smaller_group.size;
+                for point in &smaller_group.points {
+                    bigger_group.points.push(point);
+                    points_to_groups.insert(point, bigger_group_rc.clone());
+                }
+
+                // Now, all references to smaller_group should be dropped
+            }
+
+            (Some(group_one), None) => {
+                points_to_groups.insert(edge.two, group_one.clone());
+                let mut group_one = group_one.borrow_mut();
+                group_one.size += 1;
+                group_one.points.push(edge.two);
+            }
+
+            (None, Some(group_two)) => {
+                points_to_groups.insert(edge.one, group_two.clone());
+                let mut group_two = group_two.borrow_mut();
+                group_two.size += 1;
+                group_two.points.push(edge.one);
+            }
+
+            (None, None) => {
+                let group = Rc::new(RefCell::new(Group {
+                    size: 2,
+                    points: vec![edge.one, edge.two],
+                }));
+                points_to_groups.insert(edge.one, group.clone());
+                points_to_groups.insert(edge.two, group.clone());
+            }
+        }
+    }
+
+    let mut groups: Vec<Rc<RefCell<Group>>> = points_to_groups.values().cloned().collect();
+    groups.sort_unstable_by(|a, b| a.borrow().size.cmp(&b.borrow().size).reverse());
+    groups.dedup_by(|a, b| Rc::ptr_eq(a, b));
+    let product = groups
+        .iter()
+        .take(LARGEST_N_GROUPS_N)
+        .fold(1, |acc, group| acc * group.borrow().size);
+    println!("Result: {}", product);
+}
+
+fn main() {
+    let contents = fs::read_to_string("input.txt").expect("Should have been able to read the file");
+
+    // parse points
+    let mut points: Vec<Point> = Vec::new();
+    points.extend(contents.lines().map(|line| -> Point {
+        line.split(',')
+            .map(|string| string.parse::<i64>().expect("Found an invalid point"))
+            .collect::<Vec<i64>>()
+            .try_into()
+            .expect("Point does not have correct dimensions")
+    }));
+
+    let mut edges: Vec<Edge> = Vec::new();
+    for outer_index in 0..points.len() {
+        let outer = &points[outer_index];
+        // Start at outer + 1
+        for inner in points.iter().skip(outer_index + 1) {
+            // Do euclidean distance
+            let distance = (outer
+                .iter()
+                .zip(inner)
+                .fold(0, |acc, (outer_value, inner_value)| {
+                    acc + (outer_value - inner_value).pow(2)
+                }) as f64)
+                .sqrt();
+
+            // Keep edges in ascending order by distance
+            let edge_index = edges.partition_point(|edge| edge.distance <= distance); // <= creates a more efficient partition
+            edges.insert(
+                edge_index,
+                Edge {
+                    distance,
+                    one: outer,
+                    two: inner,
+                },
+            );
+        }
+    }
+
+    part_one(&edges);
+}
